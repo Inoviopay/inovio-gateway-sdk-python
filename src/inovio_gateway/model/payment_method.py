@@ -22,7 +22,7 @@ class PaymentMethod:
 
 @dataclass(frozen=True)
 class Card(PaymentMethod):
-    """Raw PAN entry — puts the caller in PCI scope. Prefer Token."""
+    """Raw card-number entry — the number passes through your server. Prefer Token."""
 
     number: str
     expiry: str

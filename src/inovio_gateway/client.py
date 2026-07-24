@@ -228,7 +228,7 @@ must be passed. Verified against the live T1 gateway.
         answers error 121.
 
         NOTE: this is a server-side call — the PAN passes through your
-        infrastructure, so you remain in PCI scope. The low-scope path is the
+        infrastructure, so you remain in your server's data flow. The low-scope path is the
         browser Hosted Fields client.
         """
         if not self._site_key:

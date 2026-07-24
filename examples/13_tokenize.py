@@ -6,8 +6,8 @@ transaction. A new token is required per transaction.
 Needs a SITE KEY: a per-site HMAC secret from Inovio support, NOT your gateway
 password. Without it the service answers error 121.
 
-⚠️ This is a SERVER-SIDE call — the PAN passes through your infrastructure, so
-you stay in PCI scope. The low-scope path is browser Hosted Fields.
+⚠️ This is a SERVER-SIDE call — the card number passes through your server.
+The browser Hosted Fields client keeps it in the cardholder's browser.
 """
 from inovio_gateway import PaymentMethods
 from _harness import client, demo, request, show, token_client
