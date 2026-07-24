@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "inovio-gateway-sdk"
+version = "0.1.0a0"
+description = "Inovio Gateway Payments Service SDK (Python)"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "UNLICENSED" }
+dependencies = []
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+inovio_gateway = ["py.typed"]
