@@ -178,7 +178,13 @@ def _make_test(fx):
             if hasattr(got, "value") and not isinstance(got, (str, int)):
                 got = got.value          # enum
             if isinstance(got, Decimal):
-                got = format(got, "f")
+                # Fixture amounts are JSON numbers (100.00), so compare
+                # numerically rather than by text — "100" and "100.0" are the
+                # same amount and the wire form varies by language.
+                got = format(got.normalize(), "f")
+                if want is not None and str(want).replace(".", "", 1).lstrip("-").isdigit():
+                    self.assertEqual(Decimal(got), Decimal(str(want)), path)
+                    continue
             self.assertEqual(got, want, path)
 
     return test

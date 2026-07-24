@@ -89,6 +89,14 @@ def normalize_response(body: str) -> Dict[str, str]:
         except ValueError as exc:
             raise TransportError("gateway returned malformed JSON", exc) from exc
 
+        # CCSTATUS answers with a COLUMNS/DATA table rather than flat fields.
+        # Flattening would destroy the row structure, so pass it through
+        # untouched under a reserved key for the client to expand.
+        if isinstance(parsed, dict) and isinstance(parsed.get("COLUMNS"), list) \
+                and isinstance(parsed.get("DATA"), list):
+            out["__TABULAR__"] = text
+            return out
+
         def flatten(obj, prefix: str = "") -> None:
             if obj is None:
                 return

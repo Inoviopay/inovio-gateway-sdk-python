@@ -12,6 +12,7 @@ from typing import Dict, List, Optional
 from ..enums.generated import (
     AVS_CODES, CVV_CODES, SERVICE_RESPONSE_CODES, TransactionStatus,
 )
+from ..errors import TransportError
 from ..model.money import Money
 from ..refs import Refs
 from . import (
@@ -166,6 +167,12 @@ def to_transaction_result(r: Dict[str, str]) -> TransactionResult:
 
 
 def _sum(values: List[Decimal], currency: str) -> Money:
+    """Sum decimal amounts.
+
+    Amounts may be NEGATIVE: the gateway reports credit and void legs with a
+    negative TRANS_VALUE, so a refund of 1.00 arrives as -1. Confirmed against
+    the live T1 gateway.
+    """
     total = sum(values, Decimal("0"))
     return Money.of(total, currency)
 
@@ -177,20 +184,46 @@ def to_order_status(r: Dict[str, str], legs: List[TransactionResult]) -> OrderSt
     def amounts(pred) -> List[Decimal]:
         return [l.amount.amount for l in legs if pred(l) and l.amount]
 
+    # Four distinct leg kinds — conflating void with refund gets the maths wrong.
+    #
+    #   CCAUTHORIZE / CCAUTHCAP  : establishes the authorized amount
+    #   CCCAPTURE                : draws down against the authorization
+    #   CCCREDIT                 : refunds a capture (money returned)
+    #   CCREVERSE / CCREVERSECAP : VOIDS — cancels an authorization or capture.
+    #                              A void is not a refund: it releases the hold,
+    #                              so it reduces `authorized` rather than
+    #                              inflating `refunded`. Verified on live T1,
+    #                              where a voided auth nets to 0 with nothing
+    #                              outstanding.
     is_auth = lambda l: re.search(r"AUTHORIZE|AUTHCAP", l.action or "", re.I)
-    is_capture = lambda l: re.search(r"CAPTURE", l.action or "", re.I) and not re.search(r"REVERSECAP", l.action or "", re.I)
-    is_refund = lambda l: re.search(r"CREDIT|REVERSE", l.action or "", re.I)
+    # CCAUTHCAP authorizes AND captures in one leg, so it counts as both —
+    # otherwise sale() reports captured=0 with the full amount outstanding,
+    # the opposite of what happened. Verified on the live T1 gateway.
+    is_capture = lambda l: re.search(r"CAPTURE|AUTHCAP", l.action or "", re.I) and not re.search(r"REVERSECAP", l.action or "", re.I)
+    is_void = lambda l: re.search(r"REVERSE", l.action or "", re.I)
+    is_refund = lambda l: re.search(r"CREDIT", l.action or "", re.I)
     approved = lambda l: l.status is TransactionStatus.APPROVED
 
-    authorized = _sum(amounts(lambda l: is_auth(l) and approved(l)), currency)
+    authorized_gross = _sum(amounts(lambda l: is_auth(l) and approved(l)), currency)
     captured = _sum(amounts(lambda l: is_capture(l) and approved(l)), currency)
-    refunded = _sum(amounts(lambda l: is_refund(l) and approved(l)), currency)
+    # Credit and void legs arrive negative; report magnitudes.
+    voided = _sum([abs(a) for a in amounts(lambda l: is_void(l) and approved(l))], currency)
+    refunded = _sum([abs(a) for a in amounts(lambda l: is_refund(l) and approved(l))], currency)
+
+    authorized = Money.of(authorized_gross.amount - voided.amount, currency)
     net = Money.of(captured.amount - refunded.amount, currency)
     outstanding = Money.of(authorized.amount - captured.amount, currency)
 
+    # CCSTATUS's tabular payload carries no top-level PO_ID — it lives on each
+    # leg. Fall back to the legs so the aggregate is keyed correctly.
+    po_id = r.get("PO_ID") or next((l.order_ref.po_id for l in legs if l.order_ref), None)
+    if not po_id:
+        raise TransportError("CCSTATUS response carried no PO_ID on any leg")
+    xtl = r.get("XTL_ORDER_ID") or next((l.xtl_order_ref.value for l in legs if l.xtl_order_ref), None)
+
     return OrderStatus(
-        ref=Refs.order(r.get("PO_ID", "")),
-        xtl_ref=Refs.xtl_order(r["XTL_ORDER_ID"]) if r.get("XTL_ORDER_ID") else None,
+        ref=Refs.order(po_id),
+        xtl_ref=Refs.xtl_order(xtl) if xtl else None,
         transactions=legs,
         authorized=authorized, captured=captured, refunded=refunded,
         net=net, outstanding=outstanding,

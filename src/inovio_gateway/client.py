@@ -234,21 +234,42 @@ class InovioClient:
 
 
 def _extract_legs(raw: Dict[str, str]) -> List[Dict[str, str]]:
-    """CCSTATUS returns multiple transactions flattened with indexed keys."""
-    indexed: Dict[int, Dict[str, str]] = {}
-    for k, v in raw.items():
-        m = re.fullmatch(r"(.*?)_(\d+)", k)
-        if not m:
+    """CCSTATUS does not answer with flat fields like every other action.
+
+    It returns a tabular payload::
+
+        {"COLUMNS": ["REQUEST_ACTION", "TRANS_STATUS_NAME", ...],
+         "DATA":    [["CCAUTHORIZE", "APPROVED", ...], ["CCCAPTURE", ...]]}
+
+    One DATA row per leg against the order. Verified against the live T1
+    gateway; the shape is not described in the v4.14 response-fields section.
+    """
+    import json as _json
+
+    tabular = raw.get("__TABULAR__")
+    if not tabular:
+        return []
+    try:
+        parsed = _json.loads(tabular)
+    except ValueError:
+        return []
+    columns, rows = parsed.get("COLUMNS"), parsed.get("DATA")
+    if not isinstance(columns, list) or not isinstance(rows, list):
+        return []
+
+    legs: List[Dict[str, str]] = []
+    for row in rows:
+        if not isinstance(row, list):
             continue
-        base, idx = m.group(1), int(m.group(2))
-        if not re.match(r"^(TRANS_|REQUEST_ACTION|SERVICE_|PROCESSOR_|API_|AVS_|CVV_|PO_ID)", base):
-            continue
-        indexed.setdefault(idx, {})[base] = v
-    # Order-level fields apply to every leg — notably CURR_CODE_ALPHA, without
-    # which a leg has no currency and its amount cannot be constructed.
-    inherited = {
-        k: raw[k]
-        for k in ("PO_ID", "XTL_ORDER_ID", "CURR_CODE_ALPHA", "MERCH_ACCT_ID")
-        if k in raw
-    }
-    return [{**inherited, **fields} for _, fields in sorted(indexed.items())]
+        leg: Dict[str, str] = {}
+        for i, col in enumerate(columns):
+            if i >= len(row):
+                break
+            v = row[i]
+            if v is None or v == "":
+                continue
+            name = str(col).upper()
+            # Duplicate column names appear (TRANS_ID twice); first wins.
+            leg.setdefault(name, str(v))
+        legs.append(leg)
+    return legs
