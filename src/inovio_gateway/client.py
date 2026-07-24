@@ -140,12 +140,33 @@ class InovioClient:
                       "REQUEST_CURRENCY": amount.currency})
         return to_transaction_result(self._call(RequestAction.CCCAPTURE.value, p))
 
-    def capture_line_item(self, item: LineItemRef,
-                          amount: Optional[Money] = None) -> TransactionResult:
-        p = {"REQUEST_REF_PO_LI_ID": item.po_li_id}
-        if amount:
-            p.update({"LI_VALUE_1": amount.to_wire(), "LI_COUNT_1": "1",
-                      "REQUEST_CURRENCY": amount.currency})
+    def capture_line_item(self, order: OrderRef, item: LineItemRef,
+                          amount: Money) -> TransactionResult:
+        """CCCAPTURE against a single line item.
+
+        Per spec §5.5.6 the gateway requires the PARENT ORDER and an amount
+alongside the line-item id — sending REQUEST_REF_PO_LI_ID alone is rejected
+with API 113 "Invalid Data". LineItemRef does not carry its order, so both
+must be passed. Verified against the live T1 gateway.
+
+        :param order: the order the line item belongs to (gateway-required)
+        :param item: the line item, from ``result.line_item_refs``
+        :param amount: required — the gateway rejects a line-item capture
+            without ``LI_VALUE_1``
+        """
+        if amount is None:
+            raise ValidationError(
+                "capture_line_item requires an amount — the gateway rejects a "
+                "line-item capture without LI_VALUE_1 (spec §5.5.6)",
+                ref_field="LI_VALUE_1",
+            )
+        p = {
+            "REQUEST_REF_PO_ID": order.po_id,
+            "REQUEST_REF_PO_LI_ID": item.po_li_id,
+            "LI_VALUE_1": amount.to_wire(),
+            "LI_COUNT_1": "1",
+            "REQUEST_CURRENCY": amount.currency,
+        }
         return to_transaction_result(self._call(RequestAction.CCCAPTURE.value, p))
 
     def reverse(self, order: OrderRef) -> TransactionResult:

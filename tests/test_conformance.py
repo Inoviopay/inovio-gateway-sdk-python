@@ -134,6 +134,13 @@ def _make_test(fx):
                 result = client.authorize(_build_request(fx["request"]))
             elif op == "status":
                 result = client.status(Refs.order(fx["request"]["orderRef"]))
+            elif op == "captureLineItem":
+                amt = fx["request"]["amount"]
+                result = client.capture_line_item(
+                    Refs.order(fx["request"]["orderRef"]),
+                    Refs.line_item(fx["request"]["lineItemRef"]),
+                    Money.of(amt["amount"], amt["currency"]),
+                )
             else:
                 self.fail(f"unhandled fixture operation: {op}")
         except Exception as e:  # noqa: BLE001 - fixtures assert on type
