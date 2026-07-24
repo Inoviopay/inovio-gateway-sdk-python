@@ -32,9 +32,17 @@ class Card(PaymentMethod):
 
 @dataclass(frozen=True)
 class Token(PaymentMethod):
-    """Single-use ephemeral token -> TOKEN_GUID."""
+    """Single-use ephemeral token -> TOKEN_GUID.
+
+    The token replaces ONLY the PAN. Per spec §4.8.2 a token-based transaction
+    still carries PMT_EXPIRY and PMT_KEY, so those travel with the token —
+    omitting the expiry yields API 110 "Required field" on REF_FIELD=pmt_expiry.
+    Verified against the live T1 gateway.
+    """
 
     guid: str
+    expiry: Optional[str] = None
+    cvv: Optional[str] = None
     kind: str = "token"
 
 
@@ -114,10 +122,15 @@ class PaymentMethods:
         return Card(number=digits, expiry=expiry, cvv=cvv)
 
     @staticmethod
-    def token(guid: str) -> Token:
+    def token(guid: str, expiry: Optional[str] = None, cvv: Optional[str] = None) -> Token:
+        """``expiry`` (MMYYYY) is required when the token is used to transact."""
         if not guid:
             raise TypeError("PaymentMethods.token: guid is required")
-        return Token(guid=guid)
+        if expiry is not None and not _EXPIRY_RE.match(expiry):
+            raise TypeError(
+                f"PaymentMethods.token: expiry must be MMYYYY (6 digits), got {expiry!r}"
+            )
+        return Token(guid=guid, expiry=expiry, cvv=cvv)
 
     @staticmethod
     def saved_card(

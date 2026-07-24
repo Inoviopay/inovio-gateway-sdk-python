@@ -19,6 +19,7 @@ from .refs import LineItemRef, OrderRef, XtlOrderId
 from .request import OrderUpdate, TransactionRequest, build_transaction_params
 from .result import HealthResult, OrderStatus, TransactionResult
 from .result.mapper import to_order_status, to_transaction_result
+from .tokenize import TokenizeResult, tokenize_card
 from .transport import ENDPOINTS, HttpClient, SANDBOX, UrllibHttpClient, send
 
 DEFAULT_TIMEOUT_MS = 120_000
@@ -49,6 +50,7 @@ class InovioClient:
         api_version: str = SPEC_API_VERSION,
         timeout_ms: int = DEFAULT_TIMEOUT_MS,
         http_client: Optional[HttpClient] = None,
+        site_key: Optional[str] = None,
     ) -> None:
         self._creds = credentials
         self._endpoint = endpoint or ENDPOINTS[environment]
@@ -58,6 +60,8 @@ class InovioClient:
         self._api_version = api_version
         self._timeout_ms = timeout_ms
         self._http = http_client or UrllibHttpClient()
+        #: Per-site HMAC secret for the token service (§4.8); tokenize() only.
+        self._site_key = site_key
 
     # ------------------------------------------------------------------
 
@@ -194,27 +198,33 @@ class InovioClient:
                 p[f"XTL_UDF{str(k).zfill(2)}"] = v
         return to_transaction_result(self._call(RequestAction.CCTRANSUPDATE.value, p))
 
-    def tokenize(self, card: Card) -> Token:
-        """Ephemeral tokenization (spec §4.8).
+    def tokenize(self, card: Card, unique_id: Optional[str] = None) -> TokenizeResult:
+        """Ephemeral tokenization (spec §4.8) — exchange a PAN for a single-use
+        ``TOKEN_GUID`` usable in place of ``PMT_NUMB``.
 
-        NOTE: this server-side call still touches the PAN and therefore keeps
-        the caller in PCI scope. The lower-scope path is the browser Hosted
-        Fields client (W-client), which tokenizes without the PAN reaching your
-        server.
+        Requires ``site_key``, the per-site HMAC secret issued by Inovio
+        support. It is NOT the gateway password; without it the token service
+        answers error 121.
+
+        NOTE: this is a server-side call — the PAN passes through your
+        infrastructure, so you remain in PCI scope. The low-scope path is the
+        browser Hosted Fields client.
         """
-        p = {
-            **self._auth_params("TOKENIZE"),
-            "PMT_NUMB": card.number,
-            "PMT_EXPIRY": card.expiry,
-        }
-        if card.cvv:
-            p["PMT_KEY"] = card.cvv
-        raw = send(self._token_endpoint, self._http, self._timeout_ms, p)
-        self._raise_if_api_error(raw)
-        guid = raw.get("TOKEN_GUID") or raw.get("TOKEN") or raw.get("TOKEN_ID")
-        if not guid:
-            raise ConfigurationError("token service did not return a TOKEN_GUID", None, raw)
-        return PaymentMethods.token(guid)
+        if not self._site_key:
+            raise ValidationError(
+                "tokenize requires `site_key` on the client — the per-site HMAC "
+                "secret from Inovio support (not your gateway password)."
+            )
+        return tokenize_card(
+            card,
+            endpoint=self._token_endpoint,
+            http_client=self._http,
+            timeout_ms=self._timeout_ms,
+            site_id=self._creds.site_id,
+            site_key=self._site_key,
+            api_version=self._api_version,
+            unique_id=unique_id,
+        )
 
     def test_auth(self) -> HealthResult:
         return self._to_health(self._call(RequestAction.TESTAUTH.value, {}))

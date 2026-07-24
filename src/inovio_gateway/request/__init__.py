@@ -97,7 +97,11 @@ def build_transaction_params(req: TransactionRequest) -> Dict[str, str]:
         _put(p, "PMT_EXPIRY", pm.expiry)
         _put(p, "PMT_KEY", pm.cvv)
     elif isinstance(pm, Token):
+        # The token stands in for the PAN only — the transaction service still
+        # requires the expiry (and CVV where the processor asks for it).
         _put(p, "TOKEN_GUID", pm.guid)
+        _put(p, "PMT_EXPIRY", pm.expiry)
+        _put(p, "PMT_KEY", pm.cvv)
     elif isinstance(pm, SavedCard):
         _put(p, "PMT_ID", pm.pmt_id)
         _put(p, "PMT_ID_XTL", pm.pmt_id_xtl)

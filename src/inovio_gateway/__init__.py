@@ -31,6 +31,10 @@ from .result import (
     CardInfo, HealthResult, NextAction, OrderStatus, Outcome, OutcomeTier,
     ServiceClassification, TransactionResult,
 )
+from .tokenize import (
+    TokenizeResult, TokenizedCardInfo, sign_token_request, token_timestamp,
+    tokenize_card, verify_token_response,
+)
 from .transport import ENDPOINTS, PRODUCTION, SANDBOX, HttpClient, UrllibHttpClient
 
 __version__ = "0.1.0a0"

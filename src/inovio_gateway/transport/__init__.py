@@ -127,7 +127,9 @@ def send(
     timeout_ms: int,
     params: Mapping[str, str],
     idempotency_key: Optional[str] = None,
+    extra_headers: Optional[Mapping[str, str]] = None,
 ) -> Dict[str, str]:
+    """``extra_headers`` carries X-SIGNATURE/X-TIMESTAMP for the token service."""
     body = form_encode(params)
     try:
         resp = http_client.post(
@@ -136,6 +138,7 @@ def send(
             {
                 "Content-Type": "application/x-www-form-urlencoded",
                 "Accept": "application/json",
+                **(extra_headers or {}),
             },
             timeout_ms,
         )
