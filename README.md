@@ -1,6 +1,6 @@
 # Inovio Gateway SDK — Python
 
-Port of the Node/TS reference (**W3** in [`../PLAN.md`](../PLAN.md)). Structurally
+Port of the Node/TS reference (**W3** of the internal SDK plan). Structurally
 identical to the other SDKs; only ergonomics differ.
 
 > **Status: alpha, local only.** Not published to PyPI.
@@ -39,8 +39,7 @@ elif result.status is TransactionStatus.PENDING:
 
 ## Five things that will surprise you
 
-Identical semantics to the Node reference — see
-[`../node/README.md`](../node/README.md) for the full rationale:
+Identical semantics to the Node reference — see the Node reference SDK's README for the full rationale:
 
 1. **A decline is not an exception.** `sale()` returns `status=DECLINED`.
    Exceptions mean you never got a payment answer.
@@ -64,13 +63,34 @@ Identical semantics to the Node reference — see
 
 ## Enums are generated
 
-`src/inovio_gateway/enums/generated.py` comes from `../spec/spec-enums.json`
+`src/inovio_gateway/enums/generated.py` comes from `spec/spec-enums.json`
 (decision **D1**). Do not edit it. The `retryable`/`terminal`/`stop_recurring`
 and AVS/CVV classifications are **derived, not from the spec** — see
-[`../spec/README.md`](../spec/README.md).
+[`spec/README.md`](spec/README.md).
+
+## Vendored spec artifacts
+
+This repo **stands alone**: `spec/spec-enums.json` and
+`spec/conformance-fixtures.json` are committed copies, so a fresh clone builds,
+tests and regenerates with no sibling checkout, submodule or network fetch.
+
+They are not the editable source — they are produced upstream in the internal
+`inoviov2` workspace (`api-sdk/spec/`), where the extraction pipeline and its
+validator live. To pull an upstream change in:
+
+```bash
+./scripts/sync-spec.sh /path/to/inoviov2/api-sdk/spec
+```
+
+Then regenerate the enums, run the suite, and commit the spec change together
+with the generated code it produces.
+
+**This is a coordinated change.** The other Inovio SDK repos vendor the same two
+files; if they are not synced in step, the SDKs silently stop agreeing — which
+is exactly what the shared conformance corpus exists to prevent.
 
 ## Conformance
 
 `tests/test_conformance.py` runs the shared corpus in
-`../spec/conformance-fixtures.json` — the same 18 fixtures every language SDK
+`spec/conformance-fixtures.json` — the same 18 fixtures every language SDK
 must pass identically.

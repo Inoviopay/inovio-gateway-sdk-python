@@ -1,6 +1,6 @@
 """Cross-language conformance suite.
 
-Runs the shared fixtures in ../../spec/conformance-fixtures.json against a
+Runs the shared fixtures in this repo's spec/conformance-fixtures.json against a
 mocked transport. Every SDK (Node, PHP, Python, Java) runs this same corpus and
 must produce the same typed result — the mechanism keeping the implementations
 honest (PLAN.md §5).
@@ -20,7 +20,7 @@ from inovio_gateway.request import TransactionRequest
 from inovio_gateway.transport import HttpResponse
 
 FIXTURES = json.loads(
-    (Path(__file__).resolve().parents[2] / "spec" / "conformance-fixtures.json").read_text()
+    (Path(__file__).resolve().parents[1] / "spec" / "conformance-fixtures.json").read_text()
 )["fixtures"]
 
 

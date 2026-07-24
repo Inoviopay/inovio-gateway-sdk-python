@@ -1,11 +1,11 @@
 """GENERATED FILE — DO NOT EDIT.
 
-Source: Inovio Gateway Payments Service API v4.14 (api-sdk/spec/spec-enums.json)
+Source: Inovio Gateway Payments Service API v4.14 (spec/spec-enums.json)
 Regenerate: python scripts/generate_enums.py
 
 Classifiers (retryable/terminal/stopRecurring, AVS/CVV classification and the
 API-code -> exception mapping) are DERIVED by the SDK project, not stated in
-the spec. See api-sdk/spec/README.md.
+the spec. See spec/README.md.
 """
 from __future__ import annotations
 

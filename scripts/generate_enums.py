@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate src/inovio_gateway/enums/generated.py from ../spec/spec-enums.json.
+"""Generate src/inovio_gateway/enums/generated.py from this repo's spec/spec-enums.json.
 
 Decision D1: enums come from one machine-readable spec artifact, not hand-copied
 per language. Do not edit the generated file — edit the spec extract and re-run.
@@ -8,7 +8,7 @@ import json
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-SPEC = HERE.parent.parent / "spec" / "spec-enums.json"
+SPEC = HERE.parent / "spec" / "spec-enums.json"
 OUT = HERE.parent / "src" / "inovio_gateway" / "enums" / "generated.py"
 
 spec = json.loads(SPEC.read_text())
@@ -19,12 +19,12 @@ L = []
 w = L.append
 w('"""GENERATED FILE — DO NOT EDIT.')
 w("")
-w(f"Source: Inovio Gateway Payments Service API v{ver} (api-sdk/spec/spec-enums.json)")
+w(f"Source: Inovio Gateway Payments Service API v{ver} (spec/spec-enums.json)")
 w("Regenerate: python scripts/generate_enums.py")
 w("")
 w("Classifiers (retryable/terminal/stopRecurring, AVS/CVV classification and the")
 w("API-code -> exception mapping) are DERIVED by the SDK project, not stated in")
-w('the spec. See api-sdk/spec/README.md.')
+w('the spec. See spec/README.md.')
 w('"""')
 w("from __future__ import annotations")
 w("")
